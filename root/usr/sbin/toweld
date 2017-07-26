@@ -1,0 +1,66 @@
+#!/usr/bin/env python2.7
+
+#
+# Copyright (C) 2017 Nethesis S.r.l.
+# http://www.nethesis.it - nethserver@nethesis.it
+#
+# This script is part of NethServer.
+#
+# NethServer is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License,
+# or any later version.
+#
+# NethServer is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NethServer.  If not, see COPYING.
+#
+
+import dbus
+import dbus.service
+import gobject
+import dbus.glib
+import os
+import logging
+import traceback
+
+logging.basicConfig(level=logging.DEBUG)
+
+class Toweld(dbus.service.Object):
+    def __init__(self):
+        self.plugins = []
+        self.bus_name = dbus.service.BusName('org.nethserver.toweld1', bus = dbus.SystemBus())
+        super(Toweld, self).__init__(self.bus_name, '/org/nethserver/toweld1/Toweld')
+
+    # This method never returns until a "stop" message is received
+    def run(self):
+        self.load_plugins()
+        self.loop = gobject.MainLoop()
+        self.loop.run()
+
+    def load_plugins(self):
+        plugins = self.plugins
+        conn = self.connection
+        path_prefix = '/org/nethserver/toweld1/'
+        for filename in os.listdir('/etc/nethserver/toweld/plugins'):
+            if filename.endswith('.py'):
+                logging.debug('Instantiating plugin from "%s"' % filename)
+                try:
+                    execfile('/etc/nethserver/toweld/plugins/%s' % filename)
+                except Exception as e:
+                    logging.exception('Plugin %s failed to load' % filename)
+
+        logging.info('Loaded plugins list: %s' % ', '.join(map((lambda o: o.__class__.__name__), self.plugins)))
+
+
+    @dbus.service.method('org.nethserver.toweld1.Toweld')
+    def Stop(self):
+        for plugin in self.plugins:
+            plugin.unload_plugin()
+        self.loop.quit()
+
+Toweld().run()
