@@ -1,0 +1,13 @@
+[Unit]
+Description=NethServer management daemon
+Documentation=https://github.com/NethServer/toweld
+After=dbus.service
+Wants=dbus.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/toweld
+ExecStop=/usr/bin/dbus-send --system  --dest=org.nethserver.Toweld1 --type=method_call /org/nethserver/Toweld1 org.nethserver.Toweld1.Stop
+
+[Install]
+WantedBy=multi-user.target
