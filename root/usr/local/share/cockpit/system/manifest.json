@@ -1,0 +1,29 @@
+{
+  "version": 0,
+  "priority": 10,
+    "menu": {
+        "index": {
+            "label": "Dashboard",
+            "order": 10
+        },
+        "apps": {
+            "label": "Applications",
+            "order": 20
+        }, 
+        "config": {
+            "label": "Configuration",
+            "order": 30
+        }
+   },
+   "tools": {
+        "terminal": {
+            "label": "Terminal"
+        },
+        "report": {
+            "label": "Weekly report"
+        },
+        "diagnostics": {
+            "label": "Diagnostics"
+        }
+    }
+}

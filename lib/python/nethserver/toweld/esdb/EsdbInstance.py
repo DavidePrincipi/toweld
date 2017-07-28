@@ -31,9 +31,29 @@ class EsdbInstance(dbus.service.Object, EsdbFileStorage):
         self.SUPPORTS_MULTIPLE_CONNECTIONS = False
         super(EsdbInstance, self).__init__(conn = conn, object_path = object_path)
         self.data = self.load(filepath)
+        self.dbus_props = {'databaseName': dbus.String(self.name, variant_level=1), 'fileSystemPath': dbus.String(self.filepath, variant_level=1)}
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature='ss', out_signature='v')
+    def Get(self, iname, pname):
+        return self.dbus_props[pname]
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature='ssv', out_signature='')
+    def Set(self, iname, pname, value):
+        self.dbus_props[pname] = dbus.String(value)
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature='s', out_signature='a{sv}')
+    def GetAll(self, iname):
+        if iname == 'org.nethserver.toweld1.Esdb':
+            return dbus.Dictionary(self.dbus_props, "sv", variant_level=1)
+        else:
+            return dbus.Dictionary({}, "sv", variant_level=1)
+
+    @dbus.service.signal(dbus.PROPERTIES_IFACE, signature='sa{sv}as')
+    def PropertiesChanged(self, interface_name, changed_properties, invalidated_properties):
+        pass
 
     @dbus.service.method('org.nethserver.toweld1.Esdb', in_signature='s', out_signature='s')
-    def Get(self, key):
+    def GetValue(self, key):
         if not key in self.data:
             return False
 
@@ -64,7 +84,7 @@ class EsdbInstance(dbus.service.Object, EsdbFileStorage):
             return ""
 
     @dbus.service.method('org.nethserver.toweld1.Esdb', in_signature='ssa{ss}', out_signature='')
-    def Set(self, key, type, props={}):
+    def SetRecord(self, key, type, props={}):
         self.data[key] = {'type': type, 'props': props}
         self.changes += 1
 
