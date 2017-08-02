@@ -22,24 +22,39 @@
 
 import dbus
 import dbus.service
-import gobject
+import glib
 import dbus.glib
 import os
 import logging
 import traceback
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 class Toweld(dbus.service.Object):
     def __init__(self):
         self.plugins = []
+        self.loop = glib.MainLoop()
         self.bus_name = dbus.service.BusName('org.nethserver.toweld1', bus = dbus.SystemBus())
         super(Toweld, self).__init__(self.bus_name, '/org/nethserver/toweld1/Toweld')
 
     # This method never returns until a "stop" message is received
     def run(self):
         self.load_plugins()
-        self.loop = gobject.MainLoop()
+        
+        
+        self.to = 0
+        
+        def timeout_handler():
+             
+            self.to += 1
+            logging.debug('Timeout %d' % self.to)
+            
+            if self.to >= 0:
+                return False
+            
+            return True
+
+        glib.timeout_add(3000, timeout_handler)
         self.loop.run()
 
     def load_plugins(self):
@@ -59,8 +74,56 @@ class Toweld(dbus.service.Object):
 
     @dbus.service.method('org.nethserver.toweld1.Toweld')
     def Stop(self):
-        for plugin in self.plugins:
-            plugin.unload_plugin()
+        del self.plugins
         self.loop.quit()
+
+    @dbus.service.method('org.nethserver.toweld1.Toweld', in_signature='sas', out_signature='i', async_callbacks=('on_success', 'on_error'))
+    def Validate(self, validator, args, on_success, on_error):
+        def fdready(fd, condition):
+            logging.debug('fd %s, condition %s' % (fd, condition))
+            if condition & (glib.IO_IN | glib.IO_PRI):
+                buf = ''
+                while True:
+                    data = os.read(fd, 1024)
+                    buf += data
+                    if len(data) < 1024 or len(buf) > 20000:
+                        break
+
+                logging.debug(buf)
+            
+            if condition & glib.IO_HUP:
+                return False
+                
+            return True
+
+        execv = ['/sbin/e-smith/validate', str(validator)]
+        execv.extend([str(s) for s in args])
+        (pid, fdin, fdout, fderr) = glib.spawn_async(execv, standard_output=False, standard_error=False, flags=glib.SPAWN_DO_NOT_REAP_CHILD)
+        glib.child_watch_add(pid, lambda pid, cond: on_success(int(cond >> 8)))
+        #glib.io_add_watch(fdout, glib.IO_IN | glib.IO_OUT | glib.IO_PRI | glib.IO_ERR | glib.IO_HUP, fdready )
+
+    @dbus.service.method('org.nethserver.toweld1.Toweld')
+    def Spawn(self):
+        def fdready(fd, condition):
+            logging.debug('fd %s, condition %s' % (fd, condition))
+            if condition & (glib.IO_IN | glib.IO_PRI):
+                buf = ''
+                while True:
+                    data = os.read(fd, 1024)
+                    buf += data
+                    if len(data) < 1024 or len(buf) > 20000:
+                        break
+                        
+                logging.debug(buf)
+            
+            if condition & glib.IO_HUP:
+                return False
+                
+            return True
+
+        (pid, fdin, fdout, fderr) = glib.spawn_async(['/usr/bin/cat', 'test invocation toweld'], standard_output=True)
+        glib.io_add_watch(fdout, glib.IO_IN | glib.IO_OUT | glib.IO_PRI | glib.IO_ERR | glib.IO_HUP, fdready )
+        logging.debug('Pid %s spawned' % pid)
+
 
 Toweld().run()
