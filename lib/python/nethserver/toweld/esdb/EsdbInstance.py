@@ -20,6 +20,7 @@
 
 import dbus
 import dbus.service
+import json
 from nethserver.toweld.esdb.EsdbStorage import EsdbFileStorage
 
 class EsdbInstance(dbus.service.Object, EsdbFileStorage):
@@ -71,6 +72,12 @@ class EsdbInstance(dbus.service.Object, EsdbFileStorage):
                 value += '|' + p + '|' + v 
         return value
 
+    @dbus.service.method('org.nethserver.toweld1.Esdb', in_signature='', out_signature='s')
+    def GetRawDb(self):
+        out = {}
+        for key in self.data:
+            out[key] = self.GetRaw(key)
+        return json.dumps(out)
 
     @dbus.service.method('org.nethserver.toweld1.Esdb', in_signature='', out_signature='as')
     def Keys(self):
